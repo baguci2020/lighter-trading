@@ -2,7 +2,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  RefreshCw, TrendingUp, TrendingDown, AlertCircle, Zap, BookOpen,
-  ChevronsUpDown, Check, BarChart2
+  RefreshCw, TrendingUp, TrendingDown, AlertCircle, Zap,
+  ChevronsUpDown, Check, ChevronDown
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { createChart, ColorType, CrosshairMode, CandlestickSeries } from "lightweight-charts";
-import type { IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts";
+import type { IChartApi, CandlestickData, Time } from "lightweight-charts";
 
 // 主流币种优先排序
 const PRIORITY_SYMBOLS = ["BTC", "ETH", "XAU", "XAG", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "DOT", "LINK", "LTC", "BCH"];
@@ -46,7 +45,16 @@ const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   take_profit_limit: "止盈限价单",
 };
 
-// ─── Market Selector (Popover + Command) ─────────────────────────────────────
+const RESOLUTIONS = [
+  { label: "1m", value: "1m" },
+  { label: "5m", value: "5m" },
+  { label: "15m", value: "15m" },
+  { label: "1h", value: "1h" },
+  { label: "4h", value: "4h" },
+  { label: "1d", value: "1d" },
+];
+
+// ─── Market Selector ──────────────────────────────────────────────────────────
 function MarketSelector({ markets, value, onChange }: {
   markets: { marketId: number; symbol: string }[];
   value: number;
@@ -58,38 +66,40 @@ function MarketSelector({ markets, value, onChange }: {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-44 justify-between bg-input border-border text-foreground h-9 text-sm font-semibold hover:bg-input/80"
-        >
-          {selectedMarket ? selectedMarket.symbol : "选择市场"}
-          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        </Button>
+        <button className="flex items-center gap-1.5 px-3 h-full hover:bg-white/5 transition-colors border-r border-border">
+          <span className="text-base font-bold text-foreground">{selectedMarket?.symbol ?? "选择市场"}</span>
+          <span className="text-xs text-muted-foreground">永续</span>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-0 bg-popover border-border" align="start">
+      <PopoverContent className="w-56 p-0 bg-popover border-border" align="start" sideOffset={0}>
         <Command>
           <CommandInput placeholder="搜索币种..." className="h-9 text-sm" />
-          <CommandList className="max-h-64">
+          <CommandList className="max-h-72">
             <CommandEmpty>未找到匹配市场</CommandEmpty>
-            <CommandGroup>
-              {markets.map(m => (
+            <CommandGroup heading="主流币种">
+              {markets.filter(m => PRIORITY_SYMBOLS.includes(m.symbol)).map(m => (
                 <CommandItem
                   key={m.marketId}
                   value={m.symbol}
-                  onSelect={() => {
-                    onChange(m.marketId);
-                    setOpen(false);
-                  }}
+                  onSelect={() => { onChange(m.marketId); setOpen(false); }}
+                  className="text-sm cursor-pointer font-medium"
+                >
+                  <Check className={`mr-2 h-3.5 w-3.5 ${m.marketId === value ? "opacity-100 text-primary" : "opacity-0"}`} />
+                  {m.symbol}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="其他市场">
+              {markets.filter(m => !PRIORITY_SYMBOLS.includes(m.symbol)).map(m => (
+                <CommandItem
+                  key={m.marketId}
+                  value={m.symbol}
+                  onSelect={() => { onChange(m.marketId); setOpen(false); }}
                   className="text-sm cursor-pointer"
                 >
-                  <Check
-                    className={`mr-2 h-3.5 w-3.5 ${m.marketId === value ? "opacity-100 text-primary" : "opacity-0"}`}
-                  />
-                  <span className={PRIORITY_SYMBOLS.includes(m.symbol) ? "font-semibold" : ""}>
-                    {m.symbol}
-                  </span>
+                  <Check className={`mr-2 h-3.5 w-3.5 ${m.marketId === value ? "opacity-100 text-primary" : "opacity-0"}`} />
+                  {m.symbol}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -106,13 +116,13 @@ function AccountSelector({ value, onChange }: { value: string; onChange: (v: str
   const accounts = listQuery.data || [];
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="bg-input border-border text-foreground h-9 text-sm">
-        <SelectValue placeholder="选择交易账户" />
+      <SelectTrigger className="bg-transparent border-0 border-r border-border rounded-none h-full px-3 text-sm text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 w-40">
+        <SelectValue placeholder="选择账户" />
       </SelectTrigger>
       <SelectContent className="bg-popover border-border">
         {accounts.map(a => (
-          <SelectItem key={a.id} value={String(a.id)} className="text-foreground">
-            {a.label} <span className="text-muted-foreground text-xs ml-1">({a.exchangeType})</span>
+          <SelectItem key={a.id} value={String(a.id)} className="text-foreground text-sm">
+            {a.label}
           </SelectItem>
         ))}
       </SelectContent>
@@ -120,31 +130,23 @@ function AccountSelector({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-// ─── K 线图组件 ───────────────────────────────────────────────────────────────
-const RESOLUTIONS = [
-  { label: "1m", value: "1m" },
-  { label: "5m", value: "5m" },
-  { label: "15m", value: "15m" },
-  { label: "1h", value: "1h" },
-  { label: "4h", value: "4h" },
-  { label: "1d", value: "1d" },
-];
-
-function KLineChart({ marketId, symbol }: { marketId: number; symbol: string }) {
+// ─── K 线图 ───────────────────────────────────────────────────────────────────
+function KLineChart({ marketId, symbol, resolution, onResolutionChange }: {
+  marketId: number;
+  symbol: string;
+  resolution: string;
+  onResolutionChange: (r: string) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const seriesRef = useRef<any>(null);
-  const [resolution, setResolution] = useState("15m");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchCandles = useCallback(async (res: string, mid: number) => {
     setLoading(true);
-    setError(null);
     try {
       const now = Date.now();
-      // 根据分辨率决定获取多少根 K 线
       const resMs: Record<string, number> = {
         "1m": 60_000, "5m": 300_000, "15m": 900_000,
         "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
@@ -152,126 +154,92 @@ function KLineChart({ marketId, symbol }: { marketId: number; symbol: string }) 
       const barMs = resMs[res] || 900_000;
       const countBack = 200;
       const start = now - barMs * countBack;
-
       const url = `https://mainnet.zklighter.elliot.ai/api/v1/candles?market_id=${mid}&resolution=${res}&start_timestamp=${start}&end_timestamp=${now}&count_back=${countBack}`;
       const resp = await fetch(url);
       const json = await resp.json();
-
       const rawCandles = (json.c || json.candles || []) as Record<string, number>[];
       const candles: CandlestickData[] = rawCandles.map((c) => ({
         time: Math.floor(c.t / 1000) as Time,
-        open: c.o,
-        high: c.h,
-        low: c.l,
-        close: c.c,
+        open: c.o, high: c.h, low: c.l, close: c.c,
       }));
-
       if (seriesRef.current && candles.length > 0) {
         seriesRef.current.setData(candles);
         chartRef.current?.timeScale().fitContent();
       }
-    } catch (e) {
-      setError("K 线数据加载失败");
+    } catch (_) {
+      // silent fail
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 初始化图表
   useEffect(() => {
     if (!containerRef.current) return;
-
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#9ca3af",
+        textColor: "#6b7280",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.05)" },
-        horzLines: { color: "rgba(255,255,255,0.05)" },
+        vertLines: { color: "rgba(255,255,255,0.04)" },
+        horzLines: { color: "rgba(255,255,255,0.04)" },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
+      rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
       timeScale: {
-        borderColor: "rgba(255,255,255,0.1)",
+        borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
       },
       width: containerRef.current.clientWidth,
-      height: 300,
+      height: containerRef.current.clientHeight || 320,
     });
-
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
+      upColor: "#16a34a",
+      downColor: "#dc2626",
+      borderUpColor: "#16a34a",
+      borderDownColor: "#dc2626",
+      wickUpColor: "#16a34a",
+      wickDownColor: "#dc2626",
     });
-
     chartRef.current = chart;
     seriesRef.current = series;
-
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width });
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        chart.applyOptions({ width: e.contentRect.width, height: e.contentRect.height });
       }
     });
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-    };
+    ro.observe(containerRef.current);
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, []);
 
-  // 当市场或分辨率变化时重新加载数据
   useEffect(() => {
-    if (seriesRef.current) {
-      fetchCandles(resolution, marketId);
-    }
+    if (seriesRef.current) fetchCandles(resolution, marketId);
   }, [marketId, resolution, fetchCandles]);
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-            <BarChart2 className="h-3.5 w-3.5" />
-            {symbol} K 线图
-            {loading && <RefreshCw className="h-3 w-3 ml-1 animate-spin text-muted-foreground" />}
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            {RESOLUTIONS.map(r => (
-              <button
-                key={r.value}
-                onClick={() => setResolution(r.value)}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  resolution === r.value
-                    ? "bg-primary text-primary-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="px-4 pb-3">
-        {error ? (
-          <div className="flex items-center justify-center h-[300px] text-xs text-destructive/70 gap-1.5">
-            <AlertCircle className="h-4 w-4" />{error}
-          </div>
-        ) : (
-          <div ref={containerRef} className="w-full" style={{ height: 300 }} />
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col h-full">
+      {/* 时间周期栏 */}
+      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-border">
+        {RESOLUTIONS.map(r => (
+          <button
+            key={r.value}
+            onClick={() => onResolutionChange(r.value)}
+            className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              resolution === r.value
+                ? "bg-primary/20 text-primary font-semibold"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+        {loading && <RefreshCw className="h-3 w-3 ml-2 animate-spin text-muted-foreground" />}
+      </div>
+      {/* 图表区域 */}
+      <div ref={containerRef} className="flex-1 min-h-0 w-full" />
+    </div>
   );
 }
 
@@ -279,77 +247,72 @@ function KLineChart({ marketId, symbol }: { marketId: number; symbol: string }) 
 function OrderBookPanel({ accountId, marketId }: { accountId: number; marketId: number }) {
   const query = trpc.account.orderBook.useQuery(
     { accountId, marketId },
-    { refetchInterval: 3000, staleTime: 1000, retry: false }
+    { refetchInterval: 2000, staleTime: 1000, retry: false }
   );
   const ob = query.data;
 
-  if (query.isLoading) return <Skeleton className="h-64 w-full" />;
-  if (query.error) return (
-    <Card className="bg-card border-border">
-      <CardContent className="py-4 text-center text-xs text-destructive/70 flex items-center justify-center gap-1.5">
-        <AlertCircle className="h-3.5 w-3.5" />无法加载订单簿
-      </CardContent>
-    </Card>
+  if (query.isLoading) return (
+    <div className="p-3 space-y-1">
+      {Array.from({ length: 16 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
+    </div>
   );
-  if (!ob) return null;
+  if (query.error || !ob) return (
+    <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-1.5">
+      <AlertCircle className="h-3.5 w-3.5" />无法加载订单簿
+    </div>
+  );
 
   const maxSize = Math.max(
     ...ob.asks.map(a => parseFloat(a.size)),
     ...ob.bids.map(b => parseFloat(b.size)),
     1
   );
+  const midPrice = ob.asks[0] && ob.bids[0]
+    ? ((parseFloat(ob.asks[0].price) + parseFloat(ob.bids[0].price)) / 2)
+    : null;
+  const spread = ob.asks[0] && ob.bids[0]
+    ? (parseFloat(ob.asks[0].price) - parseFloat(ob.bids[0].price))
+    : null;
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-          <BookOpen className="h-3.5 w-3.5" /> 订单簿
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-3">
-        <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground mb-1 px-1">
-          <span>价格 (USDC)</span>
-          <span className="text-right">数量</span>
-        </div>
-        {/* Asks */}
-        <div className="space-y-0.5 mb-1">
-          {ob.asks.slice(0, 8).reverse().map((ask, i) => (
-            <div key={i} className="relative flex justify-between text-xs px-1 py-0.5 rounded overflow-hidden">
-              <div
-                className="absolute inset-y-0 right-0 bg-sell/10"
-                style={{ width: `${(parseFloat(ask.size) / maxSize) * 100}%` }}
-              />
-              <span className="num text-sell relative z-10">{parseFloat(ask.price).toFixed(2)}</span>
-              <span className="num text-foreground relative z-10">{parseFloat(ask.size).toFixed(4)}</span>
-            </div>
-          ))}
-        </div>
-        {/* Spread */}
-        {ob.asks[0] && ob.bids[0] && (
-          <div className="text-center text-xs text-muted-foreground py-1 border-y border-border my-1">
-            <span className="num font-medium text-foreground">
-              ${((parseFloat(ob.asks[0].price) + parseFloat(ob.bids[0].price)) / 2).toFixed(2)}
-            </span>
-            <span className="ml-2 text-muted-foreground">
-              差价: {(parseFloat(ob.asks[0].price) - parseFloat(ob.bids[0].price)).toFixed(2)}
-            </span>
+    <div className="flex flex-col h-full">
+      {/* 表头 */}
+      <div className="grid grid-cols-2 text-xs text-muted-foreground px-3 py-1.5 border-b border-border">
+        <span>价格(USDC)</span>
+        <span className="text-right">数量</span>
+      </div>
+      {/* Asks */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-end">
+        {ob.asks.slice(0, 10).reverse().map((ask, i) => (
+          <div key={i} className="relative flex justify-between text-xs px-3 py-[3px] hover:bg-white/5">
+            <div className="absolute inset-y-0 right-0 bg-sell/10" style={{ width: `${(parseFloat(ask.size) / maxSize) * 100}%` }} />
+            <span className="num text-sell relative z-10">{parseFloat(ask.price).toFixed(2)}</span>
+            <span className="num text-foreground/80 relative z-10">{parseFloat(ask.size).toFixed(4)}</span>
           </div>
-        )}
-        {/* Bids */}
-        <div className="space-y-0.5 mt-1">
-          {ob.bids.slice(0, 8).map((bid, i) => (
-            <div key={i} className="relative flex justify-between text-xs px-1 py-0.5 rounded overflow-hidden">
-              <div
-                className="absolute inset-y-0 right-0 bg-buy/10"
-                style={{ width: `${(parseFloat(bid.size) / maxSize) * 100}%` }}
-              />
-              <span className="num text-buy relative z-10">{parseFloat(bid.price).toFixed(2)}</span>
-              <span className="num text-foreground relative z-10">{parseFloat(bid.size).toFixed(4)}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+      {/* 中间价 */}
+      <div className="px-3 py-2 border-y border-border bg-card/50">
+        {midPrice !== null ? (
+          <div className="flex items-center justify-between">
+            <span className="num font-bold text-sm text-foreground">{midPrice.toFixed(2)}</span>
+            {spread !== null && (
+              <span className="text-xs text-muted-foreground">差价 {spread.toFixed(2)}</span>
+            )}
+          </div>
+        ) : null}
+      </div>
+      {/* Bids */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {ob.bids.slice(0, 10).map((bid, i) => (
+          <div key={i} className="relative flex justify-between text-xs px-3 py-[3px] hover:bg-white/5">
+            <div className="absolute inset-y-0 right-0 bg-buy/10" style={{ width: `${(parseFloat(bid.size) / maxSize) * 100}%` }} />
+            <span className="num text-buy relative z-10">{parseFloat(bid.price).toFixed(2)}</span>
+            <span className="num text-foreground/80 relative z-10">{parseFloat(bid.size).toFixed(4)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -358,59 +321,52 @@ function PositionsPanel({ accountId }: { accountId: number }) {
   const query = trpc.account.positions.useQuery({ accountId }, { refetchInterval: 5000, staleTime: 2000, retry: false });
   const positions = query.data || [];
 
-  if (query.isLoading) return <Skeleton className="h-24 w-full" />;
+  if (query.isLoading) return (
+    <div className="p-3 space-y-2">
+      {[1, 2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+    </div>
+  );
   if (query.error) {
     const errCode = (query.error as { data?: { code?: string } }).data?.code;
-    const errMsg = errCode === "NOT_FOUND"
-      ? "账户不存在或已被删除"
-      : "认证失败，请检查私钥";
     return (
-      <Card className="bg-card border-border">
-        <CardContent className="py-4 text-center text-xs text-destructive/70 flex items-center justify-center gap-1.5">
-          <AlertCircle className="h-3.5 w-3.5" />{errMsg}
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-1.5">
+        <AlertCircle className="h-3.5 w-3.5" />
+        {errCode === "NOT_FOUND" ? "账户不存在" : "认证失败，请检查私钥"}
+      </div>
     );
   }
   if (positions.length === 0) return (
-    <Card className="bg-card border-border">
-      <CardContent className="py-6 text-center text-sm text-muted-foreground">暂无持仓</CardContent>
-    </Card>
+    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">暂无持仓</div>
   );
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <CardTitle className="text-xs font-semibold text-muted-foreground">当前持仓</CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-3 space-y-2">
-        {positions.map((pos, i) => {
-          const pnlNum = parseFloat(pos.unrealizedPnl);
-          const isPos = pnlNum >= 0;
-          return (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{pos.marketSymbol}</span>
-                  <Badge className={`text-xs h-4 ${pos.side === "long" ? "bg-buy/10 text-buy border-buy/20" : "bg-sell/10 text-sell border-sell/20"}`}>
-                    {pos.side === "long" ? "多" : "空"}
-                  </Badge>
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5 num">
-                  均价: {parseFloat(pos.entryPrice).toFixed(2)} | 数量: {pos.size}
-                </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-sm font-semibold num ${isPos ? "text-buy" : "text-sell"}`}>
-                  {isPos ? "+" : ""}{pnlNum.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground num">未实现盈亏</p>
-              </div>
+    <div className="overflow-auto">
+      {/* 表头 */}
+      <div className="grid grid-cols-4 text-xs text-muted-foreground px-3 py-1.5 border-b border-border sticky top-0 bg-card">
+        <span>市场</span>
+        <span className="text-right">均价</span>
+        <span className="text-right">数量</span>
+        <span className="text-right">未实现盈亏</span>
+      </div>
+      {positions.map((pos, i) => {
+        const pnl = parseFloat(pos.unrealizedPnl);
+        return (
+          <div key={i} className="grid grid-cols-4 items-center text-xs px-3 py-2.5 border-b border-border/50 hover:bg-white/5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-foreground">{pos.marketSymbol}</span>
+              <Badge className={`text-[10px] h-3.5 px-1 ${pos.side === "long" ? "bg-buy/15 text-buy border-buy/20" : "bg-sell/15 text-sell border-sell/20"}`}>
+                {pos.side === "long" ? "多" : "空"}
+              </Badge>
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+            <span className="num text-right text-foreground/80">{parseFloat(pos.entryPrice).toFixed(2)}</span>
+            <span className="num text-right text-foreground/80">{pos.size}</span>
+            <span className={`num text-right font-medium ${pnl >= 0 ? "text-buy" : "text-sell"}`}>
+              {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -427,9 +383,7 @@ function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; m
   const createOrder = trpc.trading.createOrder.useMutation({
     onSuccess: (order) => {
       toast.success(`订单已提交 #${order.orderId}`);
-      setSize("");
-      setPrice("");
-      setTriggerPrice("");
+      setSize(""); setPrice(""); setTriggerPrice("");
       utils.account.positions.invalidate({ accountId });
       utils.history.activeOrders.invalidate({ accountId });
     },
@@ -444,129 +398,91 @@ function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; m
     if (!size || parseFloat(size) <= 0) return toast.error("请输入有效的数量");
     if (needsPrice && !price) return toast.error("请输入价格");
     if (needsTrigger && !triggerPrice) return toast.error("请输入触发价格");
-
-    createOrder.mutate({
-      accountId,
-      marketId,
-      side,
-      orderType,
-      size,
-      price: needsPrice ? price : undefined,
-      triggerPrice: needsTrigger ? triggerPrice : undefined,
-      reduceOnly,
-    });
+    createOrder.mutate({ accountId, marketId, side, orderType, size, price: needsPrice ? price : undefined, triggerPrice: needsTrigger ? triggerPrice : undefined, reduceOnly });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {/* Buy/Sell Toggle */}
-      <div className="grid grid-cols-2 gap-1 p-1 bg-secondary rounded-lg">
+    <div className="flex flex-col h-full">
+      {/* 买入/卖出切换 */}
+      <div className="grid grid-cols-2 border-b border-border">
         <button
           type="button"
           onClick={() => setSide("buy")}
-          className={`py-2 rounded-md text-sm font-semibold transition-all ${side === "buy" ? "bg-buy text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`py-2.5 text-sm font-semibold transition-all border-b-2 ${side === "buy" ? "text-buy border-buy" : "text-muted-foreground border-transparent hover:text-foreground"}`}
         >
           买入 / 做多
         </button>
         <button
           type="button"
           onClick={() => setSide("sell")}
-          className={`py-2 rounded-md text-sm font-semibold transition-all ${side === "sell" ? "bg-sell text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`py-2.5 text-sm font-semibold transition-all border-b-2 ${side === "sell" ? "text-sell border-sell" : "text-muted-foreground border-transparent hover:text-foreground"}`}
         >
           卖出 / 做空
         </button>
       </div>
 
-      {/* Order Type */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">订单类型</Label>
+      {/* 表单内容 */}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 flex-1">
+        {/* 订单类型 */}
         <Select value={orderType} onValueChange={v => setOrderType(v as OrderType)}>
-          <SelectTrigger className="bg-input border-border text-foreground h-9 text-sm">
+          <SelectTrigger className="bg-input border-border text-foreground h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="bg-popover border-border">
             {(Object.keys(ORDER_TYPE_LABELS) as OrderType[]).map(t => (
-              <SelectItem key={t} value={t} className="text-foreground text-sm">
-                {ORDER_TYPE_LABELS[t]}
-              </SelectItem>
+              <SelectItem key={t} value={t} className="text-foreground text-sm">{ORDER_TYPE_LABELS[t]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Price */}
-      {needsPrice && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">价格 (USDC)</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="输入价格"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            className="bg-input border-border text-foreground num h-9 text-sm"
-          />
-        </div>
-      )}
-
-      {/* Trigger Price */}
-      {needsTrigger && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">触发价格 (USDC)</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="输入触发价格"
-            value={triggerPrice}
-            onChange={e => setTriggerPrice(e.target.value)}
-            className="bg-input border-border text-foreground num h-9 text-sm"
-          />
-        </div>
-      )}
-
-      {/* Size */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">数量</Label>
-        <Input
-          type="number"
-          step="0.001"
-          min="0"
-          placeholder="输入数量"
-          value={size}
-          onChange={e => setSize(e.target.value)}
-          className="bg-input border-border text-foreground num h-9 text-sm"
-        />
-      </div>
-
-      {/* Reduce Only */}
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={reduceOnly}
-          onChange={e => setReduceOnly(e.target.checked)}
-          className="w-4 h-4 accent-primary"
-        />
-        <span className="text-xs text-muted-foreground">仅减仓 (Reduce Only)</span>
-      </label>
-
-      {/* Submit */}
-      <Button
-        type="submit"
-        className={`w-full font-semibold ${side === "buy" ? "bg-buy hover:bg-buy/90" : "bg-sell hover:bg-sell/90"} text-white`}
-        disabled={createOrder.isPending}
-      >
-        {createOrder.isPending ? (
-          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-        ) : side === "buy" ? (
-          <TrendingUp className="h-4 w-4 mr-2" />
-        ) : (
-          <TrendingDown className="h-4 w-4 mr-2" />
+        {/* 价格 */}
+        {needsPrice && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">价格 (USDC)</Label>
+            <Input type="number" step="0.01" min="0" placeholder="输入价格" value={price}
+              onChange={e => setPrice(e.target.value)}
+              className="bg-input border-border text-foreground num h-8 text-sm" />
+          </div>
         )}
-        {createOrder.isPending ? "提交中..." : `${ORDER_TYPE_LABELS[orderType]} ${side === "buy" ? "买入" : "卖出"} ${marketSymbol}`}
-      </Button>
-    </form>
+
+        {/* 触发价格 */}
+        {needsTrigger && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">触发价格 (USDC)</Label>
+            <Input type="number" step="0.01" min="0" placeholder="输入触发价格" value={triggerPrice}
+              onChange={e => setTriggerPrice(e.target.value)}
+              className="bg-input border-border text-foreground num h-8 text-sm" />
+          </div>
+        )}
+
+        {/* 数量 */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">数量 ({marketSymbol})</Label>
+          <Input type="number" step="0.001" min="0" placeholder="输入数量" value={size}
+            onChange={e => setSize(e.target.value)}
+            className="bg-input border-border text-foreground num h-8 text-sm" />
+        </div>
+
+        {/* 仅减仓 */}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
+          <span className="text-xs text-muted-foreground">仅减仓 (Reduce Only)</span>
+        </label>
+
+        {/* 提交 */}
+        <Button
+          type="submit"
+          className={`w-full font-semibold h-9 mt-auto ${side === "buy" ? "bg-buy hover:bg-buy/90" : "bg-sell hover:bg-sell/90"} text-white`}
+          disabled={createOrder.isPending}
+        >
+          {createOrder.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : (
+            side === "buy"
+              ? <><TrendingUp className="h-4 w-4 mr-1.5" />买入 {marketSymbol}</>
+              : <><TrendingDown className="h-4 w-4 mr-1.5" />卖出 {marketSymbol}</>
+          )}
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -576,6 +492,7 @@ export default function TradingPage() {
   const [, setLocation] = useLocation();
   const [selectedAccountId, setSelectedAccountId] = useState(params.accountId || "");
   const [selectedMarketId, setSelectedMarketId] = useState<number>(0);
+  const [resolution, setResolution] = useState("15m");
 
   const accountId = selectedAccountId ? parseInt(selectedAccountId) : null;
 
@@ -594,9 +511,7 @@ export default function TradingPage() {
 
   useEffect(() => {
     if (markets.length > 0 && selectedMarketId === 0) {
-      const preferred = sortedMarkets.find(m => m.symbol === "ETH") ||
-                        sortedMarkets.find(m => m.symbol === "BTC") ||
-                        sortedMarkets[0];
+      const preferred = sortedMarkets.find(m => m.symbol === "ETH") || sortedMarkets.find(m => m.symbol === "BTC") || sortedMarkets[0];
       setSelectedMarketId(preferred.marketId);
     }
   }, [markets, selectedMarketId, sortedMarkets]);
@@ -615,10 +530,10 @@ export default function TradingPage() {
 
   if (!hasAccounts && !exchangesQuery.isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="h-12 w-12 text-muted-foreground" />
         <div className="text-center">
-          <p className="text-sm font-medium text-foreground">尚未配置交易所账户</p>
+          <p className="text-sm font-medium">尚未配置交易所账户</p>
           <p className="text-xs text-muted-foreground mt-1">请先添加您的 Lighter.xyz API Key</p>
         </div>
         <Button size="sm" onClick={() => setLocation("/exchanges")}>前往配置</Button>
@@ -628,10 +543,10 @@ export default function TradingPage() {
 
   if (accountNotFound) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle className="h-12 w-12 text-muted-foreground" />
         <div className="text-center">
-          <p className="text-sm font-medium text-foreground">账户不存在或已被删除</p>
+          <p className="text-sm font-medium">账户不存在或已被删除</p>
           <p className="text-xs text-muted-foreground mt-1">请重新选择有效的交易账户</p>
         </div>
         <Button size="sm" onClick={() => { setSelectedAccountId(""); setLocation("/trading"); }}>返回交易页</Button>
@@ -639,86 +554,107 @@ export default function TradingPage() {
     );
   }
 
+  const bal = balanceQuery.data;
+
   return (
-    <div className="p-4 space-y-4 max-w-7xl">
-      {/* Top Bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-primary" />
-          <h1 className="text-base font-bold text-foreground">交易执行</h1>
-        </div>
-        <div className="w-48">
-          <AccountSelector value={selectedAccountId} onChange={v => { setSelectedAccountId(v); setSelectedMarketId(0); }} />
-        </div>
-        {accountId && markets.length > 0 && (
-          <MarketSelector
-            markets={sortedMarkets}
-            value={selectedMarketId}
-            onChange={setSelectedMarketId}
-          />
-        )}
-        {balanceQuery.data && (
-          <div className="ml-auto flex items-center gap-4 text-xs">
-            <span className="text-muted-foreground">可用: <span className="num text-foreground font-medium">${parseFloat(balanceQuery.data.availableBalance).toFixed(2)}</span></span>
-            <span className="text-muted-foreground">保证金: <span className="num text-foreground font-medium">${parseFloat(balanceQuery.data.usedMargin).toFixed(2)}</span></span>
-            <span className={`num font-medium ${parseFloat(balanceQuery.data.unrealizedPnl) >= 0 ? "text-buy" : "text-sell"}`}>
-              未实现盈亏: {parseFloat(balanceQuery.data.unrealizedPnl) >= 0 ? "+" : ""}{parseFloat(balanceQuery.data.unrealizedPnl).toFixed(2)}
+    <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden">
+      {/* ── 顶部 Header ── */}
+      <div className="flex items-stretch h-12 border-b border-border bg-card shrink-0">
+        {/* 账户选择 */}
+        <AccountSelector
+          value={selectedAccountId}
+          onChange={v => { setSelectedAccountId(v); setSelectedMarketId(0); }}
+        />
+
+        {/* 市场选择 */}
+        {accountId && markets.length > 0 ? (
+          <MarketSelector markets={sortedMarkets} value={selectedMarketId} onChange={setSelectedMarketId} />
+        ) : (
+          <div className="flex items-center px-3 border-r border-border">
+            <span className="text-sm text-muted-foreground">
+              {!accountId ? "请先选择账户" : <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
             </span>
+          </div>
+        )}
+
+        {/* 账户余额信息 */}
+        {bal && (
+          <div className="flex items-center gap-5 px-4 ml-auto text-xs">
+            <div className="flex flex-col items-end">
+              <span className="text-muted-foreground">可用余额</span>
+              <span className="num font-medium text-foreground">${parseFloat(bal.availableBalance).toFixed(2)}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-muted-foreground">占用保证金</span>
+              <span className="num font-medium text-foreground">${parseFloat(bal.usedMargin).toFixed(2)}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-muted-foreground">未实现盈亏</span>
+              <span className={`num font-medium ${parseFloat(bal.unrealizedPnl) >= 0 ? "text-buy" : "text-sell"}`}>
+                {parseFloat(bal.unrealizedPnl) >= 0 ? "+" : ""}{parseFloat(bal.unrealizedPnl).toFixed(2)}
+              </span>
+            </div>
           </div>
         )}
       </div>
 
+      {/* ── 主体内容 ── */}
       {!accountId ? (
-        <Card className="bg-card border-border">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
-            <Zap className="h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">请先选择交易账户</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center flex-1 gap-3">
+          <Zap className="h-10 w-10 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">请先选择交易账户</p>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {/* K 线图 - 全宽 */}
-          {selectedMarket && (
-            <KLineChart marketId={selectedMarket.marketId} symbol={selectedMarket.symbol} />
-          )}
-
-          {/* 下方三列：订单簿 | 下单表单 | 持仓 */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Order Book */}
-            <div className="lg:col-span-3">
-              {selectedMarket && (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* 左侧：订单簿 */}
+          <div className="w-52 shrink-0 border-r border-border flex flex-col overflow-hidden">
+            <div className="px-3 py-2 border-b border-border">
+              <span className="text-xs font-semibold text-muted-foreground">订单簿</span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {selectedMarket ? (
                 <OrderBookPanel accountId={accountId} marketId={selectedMarket.marketId} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
               )}
             </div>
+          </div>
 
-            {/* Order Form */}
-            <div className="lg:col-span-4">
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-3 pt-4 px-4">
-                  <CardTitle className="text-sm font-semibold text-foreground">
-                    {selectedMarket ? selectedMarket.symbol : "下单"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
-                  {marketsQuery.isLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-9 w-full" />)}
-                    </div>
-                  ) : selectedMarket ? (
-                    <OrderForm
-                      accountId={accountId}
-                      marketId={selectedMarket.marketId}
-                      marketSymbol={selectedMarket.symbol}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">请选择交易市场</p>
-                  )}
-                </CardContent>
-              </Card>
+          {/* 中间：K 线图 + 下单表单 */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            {/* K 线图 */}
+            <div className="flex-1 min-h-0 border-b border-border">
+              {selectedMarket ? (
+                <KLineChart
+                  marketId={selectedMarket.marketId}
+                  symbol={selectedMarket.symbol}
+                  resolution={resolution}
+                  onResolutionChange={setResolution}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
+              )}
             </div>
+            {/* 下单表单 */}
+            <div className="h-72 shrink-0 overflow-hidden">
+              {marketsQuery.isLoading ? (
+                <div className="p-3 space-y-2">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+              ) : selectedMarket ? (
+                <OrderForm accountId={accountId} marketId={selectedMarket.marketId} marketSymbol={selectedMarket.symbol} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
+              )}
+            </div>
+          </div>
 
-            {/* Positions */}
-            <div className="lg:col-span-5">
+          {/* 右侧：持仓 */}
+          <div className="w-80 shrink-0 border-l border-border flex flex-col overflow-hidden">
+            <div className="px-3 py-2 border-b border-border">
+              <span className="text-xs font-semibold text-muted-foreground">当前持仓</span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
               <PositionsPanel accountId={accountId} />
             </div>
           </div>
