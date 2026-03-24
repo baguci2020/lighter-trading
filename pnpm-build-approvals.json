@@ -1,0 +1,5 @@
+{
+  "es5-ext": true,
+  "ffi-napi": true,
+  "ref-napi": true
+}

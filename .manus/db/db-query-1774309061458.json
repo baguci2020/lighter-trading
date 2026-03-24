@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE exchange_accounts SET encryptedPrivateKey = '{\"iv\":\"2QmKyr4lHDuCgsnC\",\"tag\":\"65m3W3XBLnUmArpUYpjSEw==\",\"ciphertext\":\"zN6u9P3PSB3d4rZMGg5H27iKSHb0fE1Kq9mah8dVHJn7SR9asQX5K/m0295xhRujzNyaNd5/NQ5zdDPWlERVbcB2TUNqFBCidvceG+/hlUg=\"}', accountIndex = '1', apiKeyIndex = '4' WHERE id = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user rSKzXx8ymAz7XFQ.root --database mGXBEgv8jDLn8qbasrXgR6 --execute UPDATE exchange_accounts SET encryptedPrivateKey = '{\"iv\":\"2QmKyr4lHDuCgsnC\",\"tag\":\"65m3W3XBLnUmArpUYpjSEw==\",\"ciphertext\":\"zN6u9P3PSB3d4rZMGg5H27iKSHb0fE1Kq9mah8dVHJn7SR9asQX5K/m0295xhRujzNyaNd5/NQ5zdDPWlERVbcB2TUNqFBCidvceG+/hlUg=\"}', accountIndex = '1', apiKeyIndex = '4' WHERE id = 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1650
+}
