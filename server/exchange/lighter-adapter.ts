@@ -504,6 +504,12 @@ export class LighterAdapter implements IExchangeService {
       const fee = parseFloat((t.taker_fee as string) || (t.maker_fee as string) || "0");
       const role = t.role === "maker" ? "maker" : "taker";
 
+      const price = parseFloat(String(t.price || "0"));
+      const size = Math.abs(parseFloat(String(t.size || t.base_amount || "0")));
+      const quoteAmount = (price * size).toFixed(6);
+      // realizedPnl from API if available
+      const realizedPnl = t.realized_pnl != null ? String(t.realized_pnl) : undefined;
+
       return {
         tradeId: String(t.trade_id || t.id || ""),
         orderId: String(t.order_index || ""),
@@ -511,11 +517,13 @@ export class LighterAdapter implements IExchangeService {
         marketSymbol: market?.symbol || `MARKET-${marketId}`,
         side: isAsk ? "sell" : "buy",
         price: String(t.price || "0"),
-        size: String(Math.abs(parseFloat(String(t.size || t.base_amount || "0")))),
+        size: String(size),
         fee: Math.abs(fee).toFixed(6),
         feeAsset: "USDC",
         role,
         timestamp: (t.timestamp as number) || Date.now(),
+        quoteAmount,
+        realizedPnl,
       } as Trade;
     });
   }

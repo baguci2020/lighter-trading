@@ -105,6 +105,8 @@ export interface Trade {
   feeAsset: string;
   role: "maker" | "taker";
   timestamp: number;        // Unix timestamp ms
+  quoteAmount?: string;     // price × size (成交金额)
+  realizedPnl?: string;     // Realized PnL for this trade (if available)
 }
 
 export interface CancelOrderParams {

@@ -1,17 +1,24 @@
+
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, Zap, BookOpen, Search } from "lucide-react";
+import {
+  RefreshCw, TrendingUp, TrendingDown, AlertCircle, Zap, BookOpen,
+  ChevronsUpDown, Check, BarChart2
+} from "lucide-react";
 import { useLocation } from "wouter";
+import { createChart, ColorType, CrosshairMode, CandlestickSeries } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts";
 
 // 主流币种优先排序
 const PRIORITY_SYMBOLS = ["BTC", "ETH", "XAU", "XAG", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "DOT", "LINK", "LTC", "BCH"];
@@ -39,58 +46,61 @@ const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   take_profit_limit: "止盈限价单",
 };
 
+// ─── Market Selector (Popover + Command) ─────────────────────────────────────
 function MarketSelector({ markets, value, onChange }: {
   markets: { marketId: number; symbol: string }[];
   value: number;
   onChange: (v: number) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const filtered = useMemo(() => {
-    if (!search.trim()) return markets;
-    return markets.filter(m => m.symbol.toLowerCase().includes(search.toLowerCase()));
-  }, [markets, search]);
-
+  const [open, setOpen] = useState(false);
   const selectedMarket = markets.find(m => m.marketId === value);
 
   return (
-    <Select value={String(value)} onValueChange={v => { onChange(parseInt(v)); setSearch(""); }}>
-      <SelectTrigger className="bg-input border-border text-foreground h-9 text-sm w-44">
-        <SelectValue placeholder="选择市场">
-          {selectedMarket ? (
-            <span className="font-semibold">{selectedMarket.symbol}</span>
-          ) : "选择市场"}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent className="bg-popover border-border w-52">
-        {/* 搜索框 */}
-        <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border sticky top-0 bg-popover z-10">
-          <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <input
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-            placeholder="搜索币种..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.stopPropagation()}
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
-        {/* 市场列表 */}
-        {filtered.length === 0 ? (
-          <div className="py-4 text-center text-xs text-muted-foreground">未找到匹配市场</div>
-        ) : (
-          filtered.map((m, idx) => (
-            <SelectItem key={m.marketId} value={String(m.marketId)} className="text-foreground text-sm">
-              <span className={idx < PRIORITY_SYMBOLS.length && PRIORITY_SYMBOLS.includes(m.symbol) ? "font-semibold" : ""}>
-                {m.symbol}
-              </span>
-            </SelectItem>
-          ))
-        )}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-44 justify-between bg-input border-border text-foreground h-9 text-sm font-semibold hover:bg-input/80"
+        >
+          {selectedMarket ? selectedMarket.symbol : "选择市场"}
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-0 bg-popover border-border" align="start">
+        <Command>
+          <CommandInput placeholder="搜索币种..." className="h-9 text-sm" />
+          <CommandList className="max-h-64">
+            <CommandEmpty>未找到匹配市场</CommandEmpty>
+            <CommandGroup>
+              {markets.map(m => (
+                <CommandItem
+                  key={m.marketId}
+                  value={m.symbol}
+                  onSelect={() => {
+                    onChange(m.marketId);
+                    setOpen(false);
+                  }}
+                  className="text-sm cursor-pointer"
+                >
+                  <Check
+                    className={`mr-2 h-3.5 w-3.5 ${m.marketId === value ? "opacity-100 text-primary" : "opacity-0"}`}
+                  />
+                  <span className={PRIORITY_SYMBOLS.includes(m.symbol) ? "font-semibold" : ""}>
+                    {m.symbol}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
+// ─── Account Selector ─────────────────────────────────────────────────────────
 function AccountSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const listQuery = trpc.exchange.list.useQuery(undefined, { staleTime: 60_000 });
   const accounts = listQuery.data || [];
@@ -110,6 +120,162 @@ function AccountSelector({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
+// ─── K 线图组件 ───────────────────────────────────────────────────────────────
+const RESOLUTIONS = [
+  { label: "1m", value: "1m" },
+  { label: "5m", value: "5m" },
+  { label: "15m", value: "15m" },
+  { label: "1h", value: "1h" },
+  { label: "4h", value: "4h" },
+  { label: "1d", value: "1d" },
+];
+
+function KLineChart({ marketId, symbol }: { marketId: number; symbol: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const seriesRef = useRef<any>(null);
+  const [resolution, setResolution] = useState("15m");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCandles = useCallback(async (res: string, mid: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const now = Date.now();
+      // 根据分辨率决定获取多少根 K 线
+      const resMs: Record<string, number> = {
+        "1m": 60_000, "5m": 300_000, "15m": 900_000,
+        "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+      };
+      const barMs = resMs[res] || 900_000;
+      const countBack = 200;
+      const start = now - barMs * countBack;
+
+      const url = `https://mainnet.zklighter.elliot.ai/api/v1/candles?market_id=${mid}&resolution=${res}&start_timestamp=${start}&end_timestamp=${now}&count_back=${countBack}`;
+      const resp = await fetch(url);
+      const json = await resp.json();
+
+      const rawCandles = (json.c || json.candles || []) as Record<string, number>[];
+      const candles: CandlestickData[] = rawCandles.map((c) => ({
+        time: Math.floor(c.t / 1000) as Time,
+        open: c.o,
+        high: c.h,
+        low: c.l,
+        close: c.c,
+      }));
+
+      if (seriesRef.current && candles.length > 0) {
+        seriesRef.current.setData(candles);
+        chartRef.current?.timeScale().fitContent();
+      }
+    } catch (e) {
+      setError("K 线数据加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 初始化图表
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#9ca3af",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,0.05)" },
+        horzLines: { color: "rgba(255,255,255,0.05)" },
+      },
+      crosshair: { mode: CrosshairMode.Normal },
+      rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.1)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      width: containerRef.current.clientWidth,
+      height: 300,
+    });
+
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderUpColor: "#22c55e",
+      borderDownColor: "#ef4444",
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
+    });
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        chart.applyOptions({ width: entry.contentRect.width });
+      }
+    });
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  // 当市场或分辨率变化时重新加载数据
+  useEffect(() => {
+    if (seriesRef.current) {
+      fetchCandles(resolution, marketId);
+    }
+  }, [marketId, resolution, fetchCandles]);
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+            <BarChart2 className="h-3.5 w-3.5" />
+            {symbol} K 线图
+            {loading && <RefreshCw className="h-3 w-3 ml-1 animate-spin text-muted-foreground" />}
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            {RESOLUTIONS.map(r => (
+              <button
+                key={r.value}
+                onClick={() => setResolution(r.value)}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  resolution === r.value
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-3">
+        {error ? (
+          <div className="flex items-center justify-center h-[300px] text-xs text-destructive/70 gap-1.5">
+            <AlertCircle className="h-4 w-4" />{error}
+          </div>
+        ) : (
+          <div ref={containerRef} className="w-full" style={{ height: 300 }} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Order Book ───────────────────────────────────────────────────────────────
 function OrderBookPanel({ accountId, marketId }: { accountId: number; marketId: number }) {
   const query = trpc.account.orderBook.useQuery(
     { accountId, marketId },
@@ -187,6 +353,7 @@ function OrderBookPanel({ accountId, marketId }: { accountId: number; marketId: 
   );
 }
 
+// ─── Positions Panel ──────────────────────────────────────────────────────────
 function PositionsPanel({ accountId }: { accountId: number }) {
   const query = trpc.account.positions.useQuery({ accountId }, { refetchInterval: 5000, staleTime: 2000, retry: false });
   const positions = query.data || [];
@@ -247,6 +414,7 @@ function PositionsPanel({ accountId }: { accountId: number }) {
   );
 }
 
+// ─── Order Form ───────────────────────────────────────────────────────────────
 function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; marketId: number; marketSymbol: string }) {
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("limit");
@@ -402,6 +570,7 @@ function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; m
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TradingPage() {
   const params = useParams<{ accountId?: string }>();
   const [, setLocation] = useLocation();
@@ -420,18 +589,17 @@ export default function TradingPage() {
   );
 
   const markets = marketsQuery.data || [];
+  const sortedMarkets = useMemo(() => sortMarkets(markets), [markets]);
   const selectedMarket = markets.find(m => m.marketId === selectedMarketId);
 
   useEffect(() => {
     if (markets.length > 0 && selectedMarketId === 0) {
-      // 优先选择 ETH，其次 BTC，最后选第一个
-      const sorted = sortMarkets(markets);
-      const preferred = sorted.find(m => m.symbol === "ETH") ||
-                        sorted.find(m => m.symbol === "BTC") ||
-                        sorted[0];
+      const preferred = sortedMarkets.find(m => m.symbol === "ETH") ||
+                        sortedMarkets.find(m => m.symbol === "BTC") ||
+                        sortedMarkets[0];
       setSelectedMarketId(preferred.marketId);
     }
-  }, [markets, selectedMarketId]);
+  }, [markets, selectedMarketId, sortedMarkets]);
 
   useEffect(() => {
     if (params.accountId) setSelectedAccountId(params.accountId);
@@ -440,7 +608,6 @@ export default function TradingPage() {
   const exchangesQuery = trpc.exchange.list.useQuery(undefined, { staleTime: 60_000, retry: false });
   const hasAccounts = (exchangesQuery.data?.length || 0) > 0;
 
-  // 检查账户是否存在（NOT_FOUND 错误）
   const accountNotFound = !!accountId && (
     (marketsQuery.error && (marketsQuery.error as { data?: { code?: string } }).data?.code === "NOT_FOUND") ||
     (balanceQuery.error && (balanceQuery.error as { data?: { code?: string } }).data?.code === "NOT_FOUND")
@@ -485,7 +652,7 @@ export default function TradingPage() {
         </div>
         {accountId && markets.length > 0 && (
           <MarketSelector
-            markets={sortMarkets(markets)}
+            markets={sortedMarkets}
             value={selectedMarketId}
             onChange={setSelectedMarketId}
           />
@@ -509,43 +676,51 @@ export default function TradingPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Order Book */}
-          <div className="lg:col-span-3">
-            {selectedMarket && (
-              <OrderBookPanel accountId={accountId} marketId={selectedMarket.marketId} />
-            )}
-          </div>
+        <div className="space-y-4">
+          {/* K 线图 - 全宽 */}
+          {selectedMarket && (
+            <KLineChart marketId={selectedMarket.marketId} symbol={selectedMarket.symbol} />
+          )}
 
-          {/* Order Form */}
-          <div className="lg:col-span-4">
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-3 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold text-foreground">
-                  {selectedMarket ? selectedMarket.symbol : "下单"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                {marketsQuery.isLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-9 w-full" />)}
-                  </div>
-                ) : selectedMarket ? (
-                  <OrderForm
-                    accountId={accountId}
-                    marketId={selectedMarket.marketId}
-                    marketSymbol={selectedMarket.symbol}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">请选择交易市场</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* 下方三列：订单簿 | 下单表单 | 持仓 */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Order Book */}
+            <div className="lg:col-span-3">
+              {selectedMarket && (
+                <OrderBookPanel accountId={accountId} marketId={selectedMarket.marketId} />
+              )}
+            </div>
 
-          {/* Positions */}
-          <div className="lg:col-span-5">
-            <PositionsPanel accountId={accountId} />
+            {/* Order Form */}
+            <div className="lg:col-span-4">
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3 pt-4 px-4">
+                  <CardTitle className="text-sm font-semibold text-foreground">
+                    {selectedMarket ? selectedMarket.symbol : "下单"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  {marketsQuery.isLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-9 w-full" />)}
+                    </div>
+                  ) : selectedMarket ? (
+                    <OrderForm
+                      accountId={accountId}
+                      marketId={selectedMarket.marketId}
+                      marketSymbol={selectedMarket.symbol}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">请选择交易市场</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Positions */}
+            <div className="lg:col-span-5">
+              <PositionsPanel accountId={accountId} />
+            </div>
           </div>
         </div>
       )}

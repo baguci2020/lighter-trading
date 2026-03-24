@@ -37,6 +37,8 @@ type Trade = {
   feeAsset: string;
   role: string;
   timestamp: number;
+  quoteAmount?: string;   // 成交金额
+  realizedPnl?: string;  // 已实现盈亏
 };
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
@@ -276,13 +278,18 @@ function TradeHistoryTab({ accountId }: { accountId: number }) {
                 <th className="text-left px-4 py-2 font-medium">方向</th>
                 <th className="text-right px-4 py-2 font-medium">成交价</th>
                 <th className="text-right px-4 py-2 font-medium">数量</th>
+                <th className="text-right px-4 py-2 font-medium">成交金额</th>
+                <th className="text-right px-4 py-2 font-medium">盈亏</th>
                 <th className="text-right px-4 py-2 font-medium">手续费</th>
                 <th className="text-left px-4 py-2 font-medium">角色</th>
                 <th className="text-right px-4 py-2 font-medium">时间</th>
               </tr>
             </thead>
             <tbody>
-              {trades.map(trade => (
+              {trades.map(trade => {
+                const pnl = trade.realizedPnl != null ? parseFloat(trade.realizedPnl) : null;
+                const quoteAmt = trade.quoteAmount ? parseFloat(trade.quoteAmount) : null;
+                return (
                 <tr key={trade.tradeId} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-2.5 font-medium text-foreground">{trade.marketSymbol}</td>
                   <td className="px-4 py-2.5">
@@ -292,6 +299,18 @@ function TradeHistoryTab({ accountId }: { accountId: number }) {
                   </td>
                   <td className="px-4 py-2.5 text-right num text-foreground">{parseFloat(trade.price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-right num text-foreground">{trade.size}</td>
+                  <td className="px-4 py-2.5 text-right num text-muted-foreground">
+                    {quoteAmt != null ? `$${quoteAmt.toFixed(2)}` : "-"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right num">
+                    {pnl != null ? (
+                      <span className={pnl >= 0 ? "text-buy font-medium" : "text-sell font-medium"}>
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(4)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-right num text-muted-foreground">{trade.fee} {trade.feeAsset}</td>
                   <td className="px-4 py-2.5">
                     <Badge variant="outline" className="text-xs h-5 border-border text-muted-foreground">
@@ -302,7 +321,8 @@ function TradeHistoryTab({ accountId }: { accountId: number }) {
                     {new Date(trade.timestamp).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
