@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   RefreshCw, TrendingUp, TrendingDown, AlertCircle, Zap,
-  ChevronsUpDown, Check, ChevronDown
+  Check, ChevronDown, Settings2
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { createChart, ColorType, CrosshairMode, CandlestickSeries } from "lightweight-charts";
@@ -66,16 +66,16 @@ function MarketSelector({ markets, value, onChange }: {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-1.5 px-3 h-full hover:bg-white/5 transition-colors border-r border-border">
-          <span className="text-base font-bold text-foreground">{selectedMarket?.symbol ?? "选择市场"}</span>
-          <span className="text-xs text-muted-foreground">永续</span>
+        <button className="flex items-center gap-2 px-4 h-full hover:bg-white/5 transition-colors border-r border-border">
+          <span className="text-sm font-bold text-foreground">{selectedMarket?.symbol ?? "选择市场"}</span>
+          <span className="text-xs text-muted-foreground bg-white/10 px-1.5 py-0.5 rounded">永续</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0 bg-popover border-border" align="start" sideOffset={0}>
+      <PopoverContent className="w-60 p-0 bg-popover border-border shadow-xl" align="start" sideOffset={0}>
         <Command>
           <CommandInput placeholder="搜索币种..." className="h-9 text-sm" />
-          <CommandList className="max-h-72">
+          <CommandList className="max-h-80">
             <CommandEmpty>未找到匹配市场</CommandEmpty>
             <CommandGroup heading="主流币种">
               {markets.filter(m => PRIORITY_SYMBOLS.includes(m.symbol)).map(m => (
@@ -87,6 +87,7 @@ function MarketSelector({ markets, value, onChange }: {
                 >
                   <Check className={`mr-2 h-3.5 w-3.5 ${m.marketId === value ? "opacity-100 text-primary" : "opacity-0"}`} />
                   {m.symbol}
+                  <span className="ml-auto text-xs text-muted-foreground">永续</span>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -116,7 +117,7 @@ function AccountSelector({ value, onChange }: { value: string; onChange: (v: str
   const accounts = listQuery.data || [];
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="bg-transparent border-0 border-r border-border rounded-none h-full px-3 text-sm text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 w-40">
+      <SelectTrigger className="bg-transparent border-0 border-r border-border rounded-none h-full px-4 text-sm text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 w-36">
         <SelectValue placeholder="选择账户" />
       </SelectTrigger>
       <SelectContent className="bg-popover border-border">
@@ -131,9 +132,8 @@ function AccountSelector({ value, onChange }: { value: string; onChange: (v: str
 }
 
 // ─── K 线图 ───────────────────────────────────────────────────────────────────
-function KLineChart({ marketId, symbol, resolution, onResolutionChange }: {
+function KLineChart({ marketId, resolution, onResolutionChange }: {
   marketId: number;
-  symbol: string;
   resolution: string;
   onResolutionChange: (r: string) => void;
 }) {
@@ -186,22 +186,22 @@ function KLineChart({ marketId, symbol, resolution, onResolutionChange }: {
         horzLines: { color: "rgba(255,255,255,0.04)" },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
+      rightPriceScale: { borderColor: "rgba(255,255,255,0.06)" },
       timeScale: {
-        borderColor: "rgba(255,255,255,0.08)",
+        borderColor: "rgba(255,255,255,0.06)",
         timeVisible: true,
         secondsVisible: false,
       },
       width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight || 320,
+      height: containerRef.current.clientHeight || 400,
     });
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#16a34a",
-      downColor: "#dc2626",
-      borderUpColor: "#16a34a",
-      borderDownColor: "#dc2626",
-      wickUpColor: "#16a34a",
-      wickDownColor: "#dc2626",
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderUpColor: "#22c55e",
+      borderDownColor: "#ef4444",
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
     });
     chartRef.current = chart;
     seriesRef.current = series;
@@ -221,7 +221,7 @@ function KLineChart({ marketId, symbol, resolution, onResolutionChange }: {
   return (
     <div className="flex flex-col h-full">
       {/* 时间周期栏 */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-border">
+      <div className="flex items-center gap-0.5 px-3 h-9 border-b border-border shrink-0">
         {RESOLUTIONS.map(r => (
           <button
             key={r.value}
@@ -252,8 +252,8 @@ function OrderBookPanel({ accountId, marketId }: { accountId: number; marketId: 
   const ob = query.data;
 
   if (query.isLoading) return (
-    <div className="p-3 space-y-1">
-      {Array.from({ length: 16 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
+    <div className="p-3 space-y-1.5">
+      {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
     </div>
   );
   if (query.error || !ob) return (
@@ -273,42 +273,52 @@ function OrderBookPanel({ accountId, marketId }: { accountId: number; marketId: 
   const spread = ob.asks[0] && ob.bids[0]
     ? (parseFloat(ob.asks[0].price) - parseFloat(ob.bids[0].price))
     : null;
+  const spreadPct = midPrice && spread ? (spread / midPrice * 100) : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full text-xs">
       {/* 表头 */}
-      <div className="grid grid-cols-2 text-xs text-muted-foreground px-3 py-1.5 border-b border-border">
+      <div className="grid grid-cols-2 text-muted-foreground px-3 py-2 border-b border-border shrink-0">
         <span>价格(USDC)</span>
         <span className="text-right">数量</span>
       </div>
-      {/* Asks */}
+
+      {/* Asks（卖单，红色，从下往上价格递增） */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-end">
-        {ob.asks.slice(0, 10).reverse().map((ask, i) => (
-          <div key={i} className="relative flex justify-between text-xs px-3 py-[3px] hover:bg-white/5">
-            <div className="absolute inset-y-0 right-0 bg-sell/10" style={{ width: `${(parseFloat(ask.size) / maxSize) * 100}%` }} />
-            <span className="num text-sell relative z-10">{parseFloat(ask.price).toFixed(2)}</span>
-            <span className="num text-foreground/80 relative z-10">{parseFloat(ask.size).toFixed(4)}</span>
+        {ob.asks.slice(0, 12).reverse().map((ask, i) => (
+          <div key={i} className="relative flex justify-between px-3 py-[2.5px] hover:bg-white/5 cursor-pointer">
+            <div
+              className="absolute inset-y-0 right-0 bg-sell/8"
+              style={{ width: `${(parseFloat(ask.size) / maxSize) * 100}%` }}
+            />
+            <span className="num text-sell relative z-10 font-mono">{parseFloat(ask.price).toFixed(2)}</span>
+            <span className="num text-foreground/70 relative z-10 font-mono">{parseFloat(ask.size).toFixed(4)}</span>
           </div>
         ))}
       </div>
+
       {/* 中间价 */}
-      <div className="px-3 py-2 border-y border-border bg-card/50">
+      <div className="px-3 py-2 border-y border-border bg-muted/30 shrink-0">
         {midPrice !== null ? (
-          <div className="flex items-center justify-between">
-            <span className="num font-bold text-sm text-foreground">{midPrice.toFixed(2)}</span>
-            {spread !== null && (
-              <span className="text-xs text-muted-foreground">差价 {spread.toFixed(2)}</span>
+          <div className="flex items-baseline justify-between">
+            <span className="num font-bold text-sm text-foreground font-mono">{midPrice.toFixed(2)}</span>
+            {spreadPct !== null && (
+              <span className="text-muted-foreground text-[10px]">差价 {spreadPct.toFixed(3)}%</span>
             )}
           </div>
         ) : null}
       </div>
-      {/* Bids */}
+
+      {/* Bids（买单，绿色） */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {ob.bids.slice(0, 10).map((bid, i) => (
-          <div key={i} className="relative flex justify-between text-xs px-3 py-[3px] hover:bg-white/5">
-            <div className="absolute inset-y-0 right-0 bg-buy/10" style={{ width: `${(parseFloat(bid.size) / maxSize) * 100}%` }} />
-            <span className="num text-buy relative z-10">{parseFloat(bid.price).toFixed(2)}</span>
-            <span className="num text-foreground/80 relative z-10">{parseFloat(bid.size).toFixed(4)}</span>
+        {ob.bids.slice(0, 12).map((bid, i) => (
+          <div key={i} className="relative flex justify-between px-3 py-[2.5px] hover:bg-white/5 cursor-pointer">
+            <div
+              className="absolute inset-y-0 right-0 bg-buy/8"
+              style={{ width: `${(parseFloat(bid.size) / maxSize) * 100}%` }}
+            />
+            <span className="num text-buy relative z-10 font-mono">{parseFloat(bid.price).toFixed(2)}</span>
+            <span className="num text-foreground/70 relative z-10 font-mono">{parseFloat(bid.size).toFixed(4)}</span>
           </div>
         ))}
       </div>
@@ -323,26 +333,29 @@ function PositionsPanel({ accountId }: { accountId: number }) {
 
   if (query.isLoading) return (
     <div className="p-3 space-y-2">
-      {[1, 2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+      {[1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}
     </div>
   );
   if (query.error) {
     const errCode = (query.error as { data?: { code?: string } }).data?.code;
     return (
-      <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-1.5">
-        <AlertCircle className="h-3.5 w-3.5" />
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-1.5 p-4">
+        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
         {errCode === "NOT_FOUND" ? "账户不存在" : "认证失败，请检查私钥"}
       </div>
     );
   }
   if (positions.length === 0) return (
-    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">暂无持仓</div>
+    <div className="flex flex-col items-center justify-center h-full text-xs text-muted-foreground gap-2 p-4">
+      <Settings2 className="h-5 w-5 opacity-40" />
+      <span>暂无持仓</span>
+    </div>
   );
 
   return (
     <div className="overflow-auto">
       {/* 表头 */}
-      <div className="grid grid-cols-4 text-xs text-muted-foreground px-3 py-1.5 border-b border-border sticky top-0 bg-card">
+      <div className="grid grid-cols-4 text-xs text-muted-foreground px-3 py-2 border-b border-border sticky top-0 bg-card">
         <span>市场</span>
         <span className="text-right">均价</span>
         <span className="text-right">数量</span>
@@ -351,16 +364,16 @@ function PositionsPanel({ accountId }: { accountId: number }) {
       {positions.map((pos, i) => {
         const pnl = parseFloat(pos.unrealizedPnl);
         return (
-          <div key={i} className="grid grid-cols-4 items-center text-xs px-3 py-2.5 border-b border-border/50 hover:bg-white/5">
+          <div key={i} className="grid grid-cols-4 items-center text-xs px-3 py-3 border-b border-border/40 hover:bg-white/5">
             <div className="flex items-center gap-1.5">
               <span className="font-medium text-foreground">{pos.marketSymbol}</span>
-              <Badge className={`text-[10px] h-3.5 px-1 ${pos.side === "long" ? "bg-buy/15 text-buy border-buy/20" : "bg-sell/15 text-sell border-sell/20"}`}>
+              <Badge className={`text-[10px] h-4 px-1 rounded ${pos.side === "long" ? "bg-buy/15 text-buy border-buy/20" : "bg-sell/15 text-sell border-sell/20"}`}>
                 {pos.side === "long" ? "多" : "空"}
               </Badge>
             </div>
-            <span className="num text-right text-foreground/80">{parseFloat(pos.entryPrice).toFixed(2)}</span>
-            <span className="num text-right text-foreground/80">{pos.size}</span>
-            <span className={`num text-right font-medium ${pnl >= 0 ? "text-buy" : "text-sell"}`}>
+            <span className="num text-right text-foreground/80 font-mono">{parseFloat(pos.entryPrice).toFixed(2)}</span>
+            <span className="num text-right text-foreground/80 font-mono">{pos.size}</span>
+            <span className={`num text-right font-semibold font-mono ${pnl >= 0 ? "text-buy" : "text-sell"}`}>
               {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
             </span>
           </div>
@@ -404,28 +417,36 @@ function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; m
   return (
     <div className="flex flex-col h-full">
       {/* 买入/卖出切换 */}
-      <div className="grid grid-cols-2 border-b border-border">
+      <div className="grid grid-cols-2 border-b border-border shrink-0">
         <button
           type="button"
           onClick={() => setSide("buy")}
-          className={`py-2.5 text-sm font-semibold transition-all border-b-2 ${side === "buy" ? "text-buy border-buy" : "text-muted-foreground border-transparent hover:text-foreground"}`}
+          className={`py-3 text-sm font-semibold transition-all border-b-2 ${
+            side === "buy"
+              ? "text-buy border-buy bg-buy/5"
+              : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/5"
+          }`}
         >
           买入 / 做多
         </button>
         <button
           type="button"
           onClick={() => setSide("sell")}
-          className={`py-2.5 text-sm font-semibold transition-all border-b-2 ${side === "sell" ? "text-sell border-sell" : "text-muted-foreground border-transparent hover:text-foreground"}`}
+          className={`py-3 text-sm font-semibold transition-all border-b-2 ${
+            side === "sell"
+              ? "text-sell border-sell bg-sell/5"
+              : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/5"
+          }`}
         >
           卖出 / 做空
         </button>
       </div>
 
       {/* 表单内容 */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 flex-1">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-4 flex-1 overflow-auto">
         {/* 订单类型 */}
         <Select value={orderType} onValueChange={v => setOrderType(v as OrderType)}>
-          <SelectTrigger className="bg-input border-border text-foreground h-8 text-xs">
+          <SelectTrigger className="bg-input border-border text-foreground h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="bg-popover border-border">
@@ -437,48 +458,59 @@ function OrderForm({ accountId, marketId, marketSymbol }: { accountId: number; m
 
         {/* 价格 */}
         {needsPrice && (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">价格 (USDC)</Label>
-            <Input type="number" step="0.01" min="0" placeholder="输入价格" value={price}
+            <Input type="number" step="0.01" min="0" placeholder="0.00" value={price}
               onChange={e => setPrice(e.target.value)}
-              className="bg-input border-border text-foreground num h-8 text-sm" />
+              className="bg-input border-border text-foreground font-mono h-9 text-sm" />
           </div>
         )}
 
         {/* 触发价格 */}
         {needsTrigger && (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">触发价格 (USDC)</Label>
-            <Input type="number" step="0.01" min="0" placeholder="输入触发价格" value={triggerPrice}
+            <Input type="number" step="0.01" min="0" placeholder="0.00" value={triggerPrice}
               onChange={e => setTriggerPrice(e.target.value)}
-              className="bg-input border-border text-foreground num h-8 text-sm" />
+              className="bg-input border-border text-foreground font-mono h-9 text-sm" />
           </div>
         )}
 
         {/* 数量 */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">数量 ({marketSymbol})</Label>
-          <Input type="number" step="0.001" min="0" placeholder="输入数量" value={size}
+          <Input type="number" step="0.001" min="0" placeholder="0.0000" value={size}
             onChange={e => setSize(e.target.value)}
-            className="bg-input border-border text-foreground num h-8 text-sm" />
+            className="bg-input border-border text-foreground font-mono h-9 text-sm" />
         </div>
 
         {/* 仅减仓 */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
-          <span className="text-xs text-muted-foreground">仅减仓 (Reduce Only)</span>
+        <label className="flex items-center gap-2 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={reduceOnly}
+            onChange={e => setReduceOnly(e.target.checked)}
+            className="w-4 h-4 rounded accent-primary"
+          />
+          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">仅减仓 (Reduce Only)</span>
         </label>
 
-        {/* 提交 */}
+        {/* 提交按钮 */}
         <Button
           type="submit"
-          className={`w-full font-semibold h-9 mt-auto ${side === "buy" ? "bg-buy hover:bg-buy/90" : "bg-sell hover:bg-sell/90"} text-white`}
+          className={`w-full font-bold h-10 mt-auto text-sm tracking-wide ${
+            side === "buy"
+              ? "bg-buy hover:bg-buy/90 text-white"
+              : "bg-sell hover:bg-sell/90 text-white"
+          }`}
           disabled={createOrder.isPending}
         >
-          {createOrder.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : (
-            side === "buy"
-              ? <><TrendingUp className="h-4 w-4 mr-1.5" />买入 {marketSymbol}</>
-              : <><TrendingDown className="h-4 w-4 mr-1.5" />卖出 {marketSymbol}</>
+          {createOrder.isPending ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : side === "buy" ? (
+            <><TrendingUp className="h-4 w-4 mr-2" />买入 {marketSymbol}</>
+          ) : (
+            <><TrendingDown className="h-4 w-4 mr-2" />卖出 {marketSymbol}</>
           )}
         </Button>
       </form>
@@ -557,9 +589,12 @@ export default function TradingPage() {
   const bal = balanceQuery.data;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden">
-      {/* ── 顶部 Header ── */}
-      <div className="flex items-stretch h-12 border-b border-border bg-card shrink-0">
+    <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-background">
+
+      {/* ══════════════════════════════════════════════════════════
+          顶部 Header：账户 | 市场 | 价格信息 | 余额
+      ══════════════════════════════════════════════════════════ */}
+      <div className="flex items-stretch h-11 border-b border-border bg-card shrink-0">
         {/* 账户选择 */}
         <AccountSelector
           value={selectedAccountId}
@@ -570,7 +605,7 @@ export default function TradingPage() {
         {accountId && markets.length > 0 ? (
           <MarketSelector markets={sortedMarkets} value={selectedMarketId} onChange={setSelectedMarketId} />
         ) : (
-          <div className="flex items-center px-3 border-r border-border">
+          <div className="flex items-center px-4 border-r border-border">
             <span className="text-sm text-muted-foreground">
               {!accountId ? "请先选择账户" : <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
             </span>
@@ -579,18 +614,18 @@ export default function TradingPage() {
 
         {/* 账户余额信息 */}
         {bal && (
-          <div className="flex items-center gap-5 px-4 ml-auto text-xs">
-            <div className="flex flex-col items-end">
-              <span className="text-muted-foreground">可用余额</span>
-              <span className="num font-medium text-foreground">${parseFloat(bal.availableBalance).toFixed(2)}</span>
+          <div className="flex items-center gap-6 px-5 ml-auto text-xs border-l border-border">
+            <div>
+              <span className="text-muted-foreground mr-1.5">可用余额</span>
+              <span className="font-semibold text-foreground font-mono">${parseFloat(bal.availableBalance).toFixed(2)}</span>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-muted-foreground">占用保证金</span>
-              <span className="num font-medium text-foreground">${parseFloat(bal.usedMargin).toFixed(2)}</span>
+            <div>
+              <span className="text-muted-foreground mr-1.5">占用保证金</span>
+              <span className="font-semibold text-foreground font-mono">${parseFloat(bal.usedMargin).toFixed(2)}</span>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-muted-foreground">未实现盈亏</span>
-              <span className={`num font-medium ${parseFloat(bal.unrealizedPnl) >= 0 ? "text-buy" : "text-sell"}`}>
+            <div>
+              <span className="text-muted-foreground mr-1.5">未实现盈亏</span>
+              <span className={`font-semibold font-mono ${parseFloat(bal.unrealizedPnl) >= 0 ? "text-buy" : "text-sell"}`}>
                 {parseFloat(bal.unrealizedPnl) >= 0 ? "+" : ""}{parseFloat(bal.unrealizedPnl).toFixed(2)}
               </span>
             </div>
@@ -598,36 +633,25 @@ export default function TradingPage() {
         )}
       </div>
 
-      {/* ── 主体内容 ── */}
+      {/* ══════════════════════════════════════════════════════════
+          主体内容
+      ══════════════════════════════════════════════════════════ */}
       {!accountId ? (
         <div className="flex flex-col items-center justify-center flex-1 gap-3">
-          <Zap className="h-10 w-10 text-muted-foreground" />
+          <Zap className="h-10 w-10 text-muted-foreground opacity-40" />
           <p className="text-sm text-muted-foreground">请先选择交易账户</p>
         </div>
       ) : (
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* 左侧：订单簿 */}
-          <div className="w-52 shrink-0 border-r border-border flex flex-col overflow-hidden">
-            <div className="px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold text-muted-foreground">订单簿</span>
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden">
-              {selectedMarket ? (
-                <OrderBookPanel accountId={accountId} marketId={selectedMarket.marketId} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
-              )}
-            </div>
-          </div>
 
-          {/* 中间：K 线图 + 下单表单 */}
+          {/* ── 左侧主区域：K 线图 + 下单表单 ── */}
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            {/* K 线图 */}
+
+            {/* K 线图（占大部分高度） */}
             <div className="flex-1 min-h-0 border-b border-border">
               {selectedMarket ? (
                 <KLineChart
                   marketId={selectedMarket.marketId}
-                  symbol={selectedMarket.symbol}
                   resolution={resolution}
                   onResolutionChange={setResolution}
                 />
@@ -635,29 +659,56 @@ export default function TradingPage() {
                 <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
               )}
             </div>
-            {/* 下单表单 */}
-            <div className="h-72 shrink-0 overflow-hidden">
+
+            {/* 下单表单（固定高度，足够显示所有字段） */}
+            <div className="h-[280px] shrink-0 overflow-hidden border-t border-border">
               {marketsQuery.isLoading ? (
-                <div className="p-3 space-y-2">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full" />)}
                 </div>
               ) : selectedMarket ? (
-                <OrderForm accountId={accountId} marketId={selectedMarket.marketId} marketSymbol={selectedMarket.symbol} />
+                <OrderForm
+                  accountId={accountId}
+                  marketId={selectedMarket.marketId}
+                  marketSymbol={selectedMarket.symbol}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
               )}
             </div>
           </div>
 
-          {/* 右侧：持仓 */}
-          <div className="w-80 shrink-0 border-l border-border flex flex-col overflow-hidden">
-            <div className="px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold text-muted-foreground">当前持仓</span>
+          {/* ── 右侧面板：订单簿（上）+ 持仓（下） ── */}
+          <div className="w-[280px] shrink-0 border-l border-border flex flex-col overflow-hidden">
+
+            {/* 订单簿标题 */}
+            <div className="flex items-center justify-between px-3 h-9 border-b border-border shrink-0">
+              <span className="text-xs font-semibold text-foreground">订单簿</span>
+              {selectedMarket && (
+                <span className="text-xs text-muted-foreground">{selectedMarket.symbol}/USDC</span>
+              )}
             </div>
-            <div className="flex-1 min-h-0 overflow-auto">
+
+            {/* 订单簿内容（占上半部分） */}
+            <div className="flex-1 min-h-0 overflow-hidden border-b border-border">
+              {selectedMarket ? (
+                <OrderBookPanel accountId={accountId} marketId={selectedMarket.marketId} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">请选择市场</div>
+              )}
+            </div>
+
+            {/* 持仓标题 */}
+            <div className="flex items-center px-3 h-9 border-b border-border shrink-0">
+              <span className="text-xs font-semibold text-foreground">当前持仓</span>
+            </div>
+
+            {/* 持仓内容（固定高度） */}
+            <div className="h-[200px] shrink-0 overflow-auto">
               <PositionsPanel accountId={accountId} />
             </div>
           </div>
+
         </div>
       )}
     </div>
