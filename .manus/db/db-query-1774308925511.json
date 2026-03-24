@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE exchange_accounts SET accountIndex = '1' WHERE accountIndex = '0' OR accountIndex IS NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user rSKzXx8ymAz7XFQ.root --database mGXBEgv8jDLn8qbasrXgR6 --execute UPDATE exchange_accounts SET accountIndex = '1' WHERE accountIndex = '0' OR accountIndex IS NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1539
+}

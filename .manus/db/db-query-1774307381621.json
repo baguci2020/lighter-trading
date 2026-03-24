@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `exchange_accounts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`exchangeType` varchar(32) NOT NULL DEFAULT 'lighter',\n\t`label` varchar(128) NOT NULL,\n\t`accountIndex` varchar(64),\n\t`apiKeyIndex` varchar(16),\n\t`l1Address` varchar(64),\n\t`encryptedApiKey` text,\n\t`encryptedPrivateKey` text,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `exchange_accounts_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user rSKzXx8ymAz7XFQ.root --database mGXBEgv8jDLn8qbasrXgR6 --execute CREATE TABLE `exchange_accounts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`exchangeType` varchar(32) NOT NULL DEFAULT 'lighter',\n\t`label` varchar(128) NOT NULL,\n\t`accountIndex` varchar(64),\n\t`apiKeyIndex` varchar(16),\n\t`l1Address` varchar(64),\n\t`encryptedApiKey` text,\n\t`encryptedPrivateKey` text,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `exchange_accounts_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2570
+}
